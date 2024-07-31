@@ -38,7 +38,7 @@ def mostrar_salas():
 
 @app.route("/")
 def home():
-    return render_template("login.html")
+    return render_template("login.html")    
 
 @app.route("/cadastro", methods=["GET", "POST"])
 def cadastro():
@@ -62,10 +62,13 @@ def cadastrar_salas():
 @app.route("/gerenciar/excluir-sala/<sala_id>", methods=["GET", "POST"])
 def excluir_sala(sala_id):
     salas = mostrar_salas()
-    salas = [sala for sala in salas if sala["id"] != sala_id]
-    
+    salas_novas = []
+    for sala in salas:
+        if sala["id"] != sala_id:
+            salas_novas.append(sala)
+
     with open("salas.csv", "w") as file:
-        for sala in salas:
+        for sala in salas_novas:
             file.write(f"{sala['id']},{sala['tipo']},{sala['capacidade']},{sala['descricao']}\n")
     
     return redirect(url_for("lista_salas"))
@@ -89,7 +92,7 @@ def reservas():
 
 def carregar_reservas():
     reserva = []
-    with open("reservas.csv") as file:
+    with open("reservas.csv", "r") as file:
         for linha in file:
             sala_id, inicio, fim = linha.strip().split(",")
             reserva.append({
@@ -111,19 +114,16 @@ def verificar_reservas(sala_id, inicio, fim):
     return False
 
 @app.route("/detalhe-reserva")
-def detalhe_reserva():
-    sala_id = request.args.get("sala_id")
-    inicio = request.args.get("inicio")
-    fim = request.args.get("fim")
+def detalhe_reserva(sala_id, inicio, fim):
+    sala = next((s for s in mostrar_salas() if s["id"] == sala_id), None)
 
-    sala = next((s for s in lista_salas() if s["id"] == sala_id), None)
-
-    return render_template("reserva/detalhe-reserva.html", sala=sala, inicio=inicio, fim=fim)
+    return render_template("detalhe-reserva.html", sala=sala, inicio=inicio, fim=fim)
 
 
 @app.route("/reservar", methods=["GET", "POST"])
 def reservar_sala():
-    salas = lista_salas()
+    salas = mostrar_salas()
+    print(salas)
     if request.method == "POST":
         sala_id = request.form.get("sala")
         inicio = request.form.get("inicio")
@@ -131,12 +131,14 @@ def reservar_sala():
         inicio_dt = datetime.datetime.fromisoformat(inicio)
         fim_dt = datetime.datetime.fromisoformat(fim)
 
+        print(sala_id)
+
         if verificar_reservas(sala_id, inicio_dt, fim_dt):
             return render_template("reservar-sala.html", salas=salas, error="Conflito de horário! Escolha outro horário.")
 
-        salvar_reserva(sala_id, inicio, fim)
-        return redirect(url_for("detalhe-reserva", sala_id=sala_id, inicio=inicio, fim=fim))
+        salvar_reserva(sala_id, inicio_dt, fim_dt)
+        return redirect(url_for("reservar_sala"))
 
     return render_template("reservar-sala.html", salas=salas)
 
-app.run()
+app.run(port="5001", debug=True)
