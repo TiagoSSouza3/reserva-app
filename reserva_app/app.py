@@ -1,7 +1,47 @@
 from flask import Flask, redirect, render_template, request, url_for
-import uuid, datetime
+import datetime
 
 app = Flask(__name__)
+
+def id_unico_salas():
+    id_unico = 0
+    with open("salas.csv", "r") as file:
+        if file.readlines() == "":
+            return 0
+        for linha in file.readlines():
+            id_unico += 1
+    return id_unico
+
+def id_unico_usuarios():
+    id_unico = 0
+    with open("usuarios.csv", "r") as file:
+        if file.readlines() == "":
+            return 0
+        for linha in file.readlines():
+            id_unico += 1
+    return id_unico
+
+def id_unico_reservas():
+    id_unico = 0
+    with open("reservas.csv", "r") as file:
+        if file.readlines() == "":
+            return 0
+        for linha in file.readlines():
+            id_unico += 1
+    return id_unico
+
+def busca_binaria(lista, elemento):
+    inicio = 0
+    fim = len(lista) - 1
+    while inicio <= fim:
+        meio = (inicio + fim) // 2
+        if lista[meio] == elemento:
+            return meio
+        elif lista[meio] > elemento:
+            fim = meio - 1
+        else:
+            inicio = meio + 1
+    return -1
 
 def cadastrar_usuario(usuario):
     with open("usuarios.csv", "a") as file:
@@ -9,6 +49,7 @@ def cadastrar_usuario(usuario):
 
 def verificar_usuario(email, senha):
     with open("usuarios.csv") as file:
+        emails = []
         for linha in file.readlines():
             nome, email_usuario, senha_usuario = linha.strip().split(",")
             if email == email_usuario and senha == senha_usuario:
@@ -17,7 +58,7 @@ def verificar_usuario(email, senha):
 
 def cadastrar_sala(sala):
     with open("salas.csv", "a") as file:
-        file.write(f"\n{str(uuid.uuid4())},{sala['tipo']},{sala['capacidade']},{sala['descricao']},Sim")
+        file.write(f"\n{str(id_unico_salas())},{sala['tipo']},{sala['capacidade']},{sala['descricao']},Sim")
 
 def mostrar_salas():
     with open("salas.csv") as file:
@@ -141,4 +182,4 @@ def reservar_sala():
 
     return render_template("reservar-sala.html", salas=salas)
 
-app.run(port="5001", debug=True)
+app.run(debug=True)
