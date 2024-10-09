@@ -1,5 +1,37 @@
 from flask import Flask, redirect, render_template, request, url_for
 import datetime
+from reserva_app.conexao_bd import conexao_fechar, conexao_abrir
+
+
+def clienteListar(con):
+    cursor = con.cursor()
+    sql = "SELECT * FROM cliente"
+    cursor = con.cursor(dictionary=True)
+    cursor.execute(sql)
+
+    for (registro) in cursor:
+        print(registro['cli_nome'] + " - "+ registro['cli_fone'])
+
+    cursor.close()
+    #con.commit()
+
+
+def clienteInserir(con, codigo, nome, fone, email):
+     cursor = con.cursor()
+     sql = "INSERT INTO cliente (cli_codigo, cli_nome, cli_fone, cli_email) VALUES (%s, %s, %s, %s)"
+     cursor.execute(sql, (codigo, nome, fone, email))
+     con.commit() 
+     cursor.close()
+        
+
+def main():
+    con = conexao_abrir("localhost", "root", "", "teste_python")
+    
+    clienteInserir(con, 10, "evandro", "8876-2222","teste@teste")
+    clienteListar(con)
+
+    conexao_fechar(con)
+
 
 app = Flask(__name__)
 
@@ -182,4 +214,7 @@ def reservar_sala():
 
     return render_template("reservar-sala.html", salas=salas)
 
+if __name__ == "__main__":
+	main()
+   
 app.run(debug=True)
