@@ -1,66 +1,8 @@
 from flask import Flask, redirect, render_template, request, url_for
 import datetime
-from reserva_app.conexao_bd import conexao_fechar, conexao_abrir
-
-
-def clienteListar(con):
-    cursor = con.cursor()
-    sql = "SELECT * FROM cliente"
-    cursor = con.cursor(dictionary=True)
-    cursor.execute(sql)
-
-    for (registro) in cursor:
-        print(registro['cli_nome'] + " - "+ registro['cli_fone'])
-
-    cursor.close()
-    #con.commit()
-
-
-def clienteInserir(con, codigo, nome, fone, email):
-     cursor = con.cursor()
-     sql = "INSERT INTO cliente (cli_codigo, cli_nome, cli_fone, cli_email) VALUES (%s, %s, %s, %s)"
-     cursor.execute(sql, (codigo, nome, fone, email))
-     con.commit() 
-     cursor.close()
-        
-
-def main():
-    con = conexao_abrir("localhost", "root", "", "teste_python")
-    
-    clienteInserir(con, 10, "evandro", "8876-2222","teste@teste")
-    clienteListar(con)
-
-    conexao_fechar(con)
-
+from reserva_app.database import *
 
 app = Flask(__name__)
-
-def id_unico_salas():
-    id_unico = 0
-    with open("salas.csv", "r") as file:
-        if file.readlines() == "":
-            return 0
-        for linha in file.readlines():
-            id_unico += 1
-    return id_unico
-
-def id_unico_usuarios():
-    id_unico = 0
-    with open("usuarios.csv", "r") as file:
-        if file.readlines() == "":
-            return 0
-        for linha in file.readlines():
-            id_unico += 1
-    return id_unico
-
-def id_unico_reservas():
-    id_unico = 0
-    with open("reservas.csv", "r") as file:
-        if file.readlines() == "":
-            return 0
-        for linha in file.readlines():
-            id_unico += 1
-    return id_unico
 
 def busca_binaria(lista, elemento):
     inicio = 0
@@ -76,41 +18,25 @@ def busca_binaria(lista, elemento):
     return -1
 
 def cadastrar_usuario(usuario):
-    with open("usuarios.csv", "a") as file:
-        file.write(f"\n{usuario['nome']},{usuario['email']},{usuario['password']}")
+    salvar_db(usuario, "Usuario")
 
 def verificar_usuario(email, senha):
-    with open("usuarios.csv") as file:
-        emails = []
-        for linha in file.readlines():
-            nome, email_usuario, senha_usuario = linha.strip().split(",")
-            if email == email_usuario and senha == senha_usuario:
-                return True
+    salas = ler_db("Usuario")
+    for linha in salas:
+        nome, email_usuario, senha_usuario = linha.strip().split(",")
+        if email == email_usuario and senha == senha_usuario:
+            return True
     return False
 
 def cadastrar_sala(sala):
-    with open("salas.csv", "a") as file:
-        file.write(f"\n{str(id_unico_salas())},{sala['tipo']},{sala['capacidade']},{sala['descricao']},Sim")
+    salvar_db(sala, "Sala")
 
 def mostrar_salas():
-    with open("salas.csv") as file:
-        salas = []
-        for linha in file:
-            valores = linha.strip().split(",")
-            if len(valores) == 5:
-                sala_id, tipo, capacidade, descricao, ativa = valores
-                sala = {
-                    "id": sala_id,
-                    "tipo": tipo,
-                    "capacidade": capacidade,
-                    "descricao": descricao,
-                    "ativa": ativa
-                }
-                salas.append(sala)
-    return salas
+    return ler_db("Sala")
 
 @app.route("/")
 def home():
+    init_db()
     return render_template("login.html")    
 
 @app.route("/cadastro", methods=["GET", "POST"])
@@ -134,16 +60,7 @@ def cadastrar_salas():
 
 @app.route("/gerenciar/excluir-sala/<sala_id>", methods=["GET", "POST"])
 def excluir_sala(sala_id):
-    salas = mostrar_salas()
-    salas_novas = []
-    for sala in salas:
-        if sala["id"] != sala_id:
-            salas_novas.append(sala)
-
-    with open("salas.csv", "w") as file:
-        for sala in salas_novas:
-            file.write(f"{sala['id']},{sala['tipo']},{sala['capacidade']},{sala['descricao']}\n")
-    
+    excluir_sala_db(sala_id)
     return redirect(url_for("lista_salas"))
 
 @app.route("/gerenciar/desativar-sala/<sala_id>", methods=["GET", "POST"])
@@ -151,12 +68,8 @@ def desativar_sala(sala_id):
     salas = mostrar_salas()
     for sala in salas:
         if sala["id"] == sala_id:
-            sala["ativa"] = "Não" if sala["ativa"] == "Sim" else "Sim"
-    
-    with open("salas.csv", "w") as file:
-        for sala in salas:
-            file.write(f"{sala['id']},{sala['tipo']},{sala['capacidade']},{sala['descricao']},{sala['ativa']}\n")
-    
+            update_sala_db(sala["id"], sala["ativa"])
+
     return redirect(url_for("lista_salas"))
 
 @app.route("/reservas")
@@ -164,23 +77,13 @@ def reservas():
     return render_template("reservas.html")
 
 def carregar_reservas():
-    reserva = []
-    with open("reservas.csv", "r") as file:
-        for linha in file:
-            sala_id, inicio, fim = linha.strip().split(",")
-            reserva.append({
-                "sala_id": sala_id,
-                "inicio": datetime.datetime.fromisoformat(inicio),
-                "fim": datetime.datetime.fromisoformat(fim)
-            })
-    return reserva
+    return ler_db("Reserva")
 
 def salvar_reserva(sala_id, inicio, fim):
-    with open("reservas.csv", "a") as file:
-        file.write(f"{sala_id},{inicio},{fim}\n")
+    salvar_db([sala_id, inicio, fim], "Reserva")
 
 def verificar_reservas(sala_id, inicio, fim):
-    for reserva in carregar_reservas():
+    for reserva in ler_db("Reserva"):
         if reserva["sala_id"] == sala_id:
             if inicio < reserva["fim"] and fim > reserva["inicio"]:
                 return True
@@ -196,15 +99,12 @@ def detalhe_reserva(sala_id, inicio, fim):
 @app.route("/reservar", methods=["GET", "POST"])
 def reservar_sala():
     salas = mostrar_salas()
-    print(salas)
     if request.method == "POST":
         sala_id = request.form.get("sala")
         inicio = request.form.get("inicio")
         fim = request.form.get("fim")
         inicio_dt = datetime.datetime.fromisoformat(inicio)
         fim_dt = datetime.datetime.fromisoformat(fim)
-
-        print(sala_id)
 
         if verificar_reservas(sala_id, inicio_dt, fim_dt):
             return render_template("reservar-sala.html", salas=salas, error="Conflito de horário! Escolha outro horário.")
@@ -213,8 +113,5 @@ def reservar_sala():
         return redirect(url_for("reservar_sala"))
 
     return render_template("reservar-sala.html", salas=salas)
-
-if __name__ == "__main__":
-	main()
    
 app.run(debug=True)
